@@ -1,78 +1,91 @@
-import { Categoria, Cliente, Triagem, TriagemDetalheResponse } from '../types';
+import type { LoginResponse, MeResponse } from '../types';
 
-const API_BASE = 'http://localhost:3001/api';
+export const API_BASE = '/api';
+export const AUTH_TOKEN_STORAGE_KEY = 'benchos_token';
 
-export async function fetchTriagens(busca?: string, status?: string): Promise<Triagem[]> {
-  const params = new URLSearchParams();
-  if (busca) params.append('busca', busca);
-  if (status) params.append('status', status);
+type UnauthorizedHandler = () => void;
 
-  const res = await fetch(`${API_BASE}/triagens?${params.toString()}`);
-  if (!res.ok) throw new Error('Falha ao carregar triagens');
-  return res.json();
-}
+let unauthorizedHandler: UnauthorizedHandler | null = null;
 
-export async function fetchTriagemDetalhe(id: number): Promise<TriagemDetalheResponse> {
-  const res = await fetch(`${API_BASE}/triagens/${id}`);
-  if (!res.ok) throw new Error('Falha ao carregar detalhes da triagem');
-  return res.json();
-}
+export class ApiError extends Error {
+  status: number;
+  code?: string;
 
-export async function fetchCategorias(): Promise<Categoria[]> {
-  const res = await fetch(`${API_BASE}/categorias`);
-  if (!res.ok) throw new Error('Falha ao carregar categorias');
-  return res.json();
-}
-
-export async function fetchClientes(): Promise<Cliente[]> {
-  const res = await fetch(`${API_BASE}/clientes`);
-  if (!res.ok) throw new Error('Falha ao carregar clientes');
-  return res.json();
-}
-
-export async function criarCliente(nome: string, telefone?: string, documento?: string): Promise<Cliente> {
-  const res = await fetch(`${API_BASE}/clientes`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nome, telefone, documento }),
-  });
-  if (!res.ok) throw new Error('Falha ao cadastrar cliente');
-  return res.json();
-}
-
-export async function criarTriagem(dados: {
-  cliente_id: number;
-  categoria_id: number;
-  modelo: string;
-  fabricante: string;
-  numero_serie_mac: string;
-  defeito_reclamado: string;
-  acessorios_inclusos?: string;
-  tecnico_responsavel?: string;
-}): Promise<{ id: number }> {
-  const res = await fetch(`${API_BASE}/triagens`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(dados),
-  });
-  if (!res.ok) throw new Error('Falha ao cadastrar triagem');
-  return res.json();
-}
-
-export async function concluirTriagem(
-  id: number,
-  dados: {
-    diagnostico_final: string;
-    parecer_tecnico: string;
-    tecnico_responsavel: string;
-    respostas: Array<{ item_checklist_id: number; passou: boolean; observacao?: string }>;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
   }
-): Promise<{ message: string }> {
-  const res = await fetch(`${API_BASE}/triagens/${id}/concluir`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(dados),
+}
+
+export function getAuthToken(): string | null {
+  return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+}
+
+export function setAuthToken(token: string): void {
+  localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+}
+
+export function clearAuthToken(): void {
+  localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+}
+
+export function registerUnauthorizedHandler(cb: UnauthorizedHandler | null): void {
+  unauthorizedHandler = cb;
+}
+
+export async function apiFetch<T = unknown>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const headers = new Headers(options.headers);
+  const token = getAuthToken();
+
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  if (typeof options.body === 'string' && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const res = await fetch(`${API_BASE}${normalizedPath}`, {
+    ...options,
+    headers,
   });
-  if (!res.ok) throw new Error('Falha ao concluir triagem');
-  return res.json();
+
+  if (res.status === 401 && !normalizedPath.startsWith('/auth/login')) {
+    unauthorizedHandler?.();
+  }
+
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => null)) as
+      | { error?: unknown; code?: unknown }
+      | null;
+    const message =
+      payload && typeof payload.error === 'string' && payload.error.trim().length > 0
+        ? payload.error
+        : `Erro na requisição (${res.status})`;
+    const code = payload && typeof payload.code === 'string' ? payload.code : undefined;
+    throw new ApiError(message, res.status, code);
+  }
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  return res.json() as Promise<T>;
+}
+
+export function loginRequest(email: string, senha: string): Promise<LoginResponse> {
+  return apiFetch<LoginResponse>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, senha }),
+  });
+}
+
+export function fetchMeRequest(): Promise<MeResponse> {
+  return apiFetch<MeResponse>('/auth/me');
 }
