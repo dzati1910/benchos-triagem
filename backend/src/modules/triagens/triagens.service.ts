@@ -54,10 +54,16 @@ async function ensureClienteExists(clienteId: number): Promise<void> {
   }
 }
 
-async function ensureCategoriaExists(categoriaId: number): Promise<void> {
+async function ensureCategoriaExists(
+  categoriaId: number,
+  options: { requireActive?: boolean } = {},
+): Promise<void> {
   const categoria = await triagensRepository.findCategoriaById(categoriaId);
   if (!categoria) {
     throw new AppError('Categoria não encontrada.', 404);
+  }
+  if (options.requireActive && !categoria.ativo) {
+    throw new AppError('Categoria inativa não pode receber novas triagens.', 400);
   }
 }
 
@@ -119,7 +125,7 @@ export const triagensService = {
 
   async createTriagem(input: CreateTriagemInput, actorId: number): Promise<TriagemComRelacoes> {
     await ensureClienteExists(input.clienteId);
-    await ensureCategoriaExists(input.categoriaId);
+    await ensureCategoriaExists(input.categoriaId, { requireActive: true });
 
     return triagensRepository.create({
       clienteId: input.clienteId,
@@ -148,12 +154,12 @@ export const triagensService = {
       await ensureClienteExists(input.clienteId);
     }
 
-    if (input.categoriaId !== undefined) {
-      await ensureCategoriaExists(input.categoriaId);
-    }
-
     const categoriaAlterada =
       input.categoriaId !== undefined && input.categoriaId !== existing.categoriaId;
+
+    if (input.categoriaId !== undefined) {
+      await ensureCategoriaExists(input.categoriaId, { requireActive: categoriaAlterada });
+    }
     let deveLimparRespostas = false;
 
     if (categoriaAlterada) {

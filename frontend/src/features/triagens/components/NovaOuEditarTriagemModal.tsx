@@ -131,6 +131,8 @@ export const NovaOuEditarTriagemModal: React.FC<NovaOuEditarTriagemModalProps> =
     setExigirConfirmacao409(false);
     setConfirmandoCancelamento(false);
     setReincidencias([]);
+    setBuscandoReincidencia(false);
+    serialReqCounterRef.current += 1;
     ultimoSerialConsultadoRef.current = '';
 
     if (triagemEdicao) {
@@ -159,6 +161,8 @@ export const NovaOuEditarTriagemModal: React.FC<NovaOuEditarTriagemModalProps> =
   const consultarReincidencia = async (serialBruto: string, force = false) => {
     const normalizado = normalizarSerialInput(serialBruto);
     if (!normalizado || normalizado.length < 3) {
+      serialReqCounterRef.current += 1;
+      setBuscandoReincidencia(false);
       setReincidencias([]);
       ultimoSerialConsultadoRef.current = '';
       return;
@@ -195,6 +199,8 @@ export const NovaOuEditarTriagemModal: React.FC<NovaOuEditarTriagemModalProps> =
 
     const normalizado = normalizarSerialInput(numeroSerieMac);
     if (normalizado.length < 3) {
+      serialReqCounterRef.current += 1;
+      setBuscandoReincidencia(false);
       setReincidencias([]);
       ultimoSerialConsultadoRef.current = '';
       return;
@@ -476,6 +482,12 @@ export const NovaOuEditarTriagemModal: React.FC<NovaOuEditarTriagemModalProps> =
                       type="text"
                       value={novoClienteNome}
                       onChange={(e) => setNovoClienteNome(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void handleCriarClienteInline();
+                        }
+                      }}
                       placeholder="Ex: João Silva / Cond. Alfa"
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                     />
@@ -492,6 +504,12 @@ export const NovaOuEditarTriagemModal: React.FC<NovaOuEditarTriagemModalProps> =
                       type="text"
                       value={novoClienteTelefone}
                       onChange={(e) => setNovoClienteTelefone(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void handleCriarClienteInline();
+                        }
+                      }}
                       placeholder="(11) 99999-9999"
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                     />
@@ -508,6 +526,12 @@ export const NovaOuEditarTriagemModal: React.FC<NovaOuEditarTriagemModalProps> =
                       type="text"
                       value={novoClienteDocumento}
                       onChange={(e) => setNovoClienteDocumento(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void handleCriarClienteInline();
+                        }
+                      }}
                       placeholder="Opcional"
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                     />

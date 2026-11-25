@@ -73,6 +73,8 @@ export const ChecklistsAdminPage: React.FC = () => {
   const [editItemDescricao, setEditItemDescricao] = useState('');
   const [editItemComoTestar, setEditItemComoTestar] = useState('');
   const [editItemOrdem, setEditItemOrdem] = useState('1');
+  const [processandoCatToggle, setProcessandoCatToggle] = useState(false);
+  const [processandoItemId, setProcessandoItemId] = useState<number | null>(null);
 
   const carregarCategorias = useCallback(async (preferredId?: number) => {
     setCarregando(true);
@@ -166,6 +168,7 @@ export const ChecklistsAdminPage: React.FC = () => {
   const handleToggleCategoriaAtiva = async (cat: Categoria) => {
     setErro(null);
     setFeedback(null);
+    setProcessandoCatToggle(true);
     try {
       const atualizada = await atualizarCategoria(cat.id, { ativo: !cat.ativo });
       await carregarCategorias(atualizada.id);
@@ -176,6 +179,8 @@ export const ChecklistsAdminPage: React.FC = () => {
       );
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Não foi possível alterar o status da categoria.');
+    } finally {
+      setProcessandoCatToggle(false);
     }
   };
 
@@ -241,6 +246,7 @@ export const ChecklistsAdminPage: React.FC = () => {
     if (!categoriaSelecionada) return;
     setErro(null);
     setFeedback(null);
+    setProcessandoItemId(item.id);
     try {
       const atualizado = await atualizarItemChecklist(item.id, { ativo: !item.ativo });
       await carregarCategorias(categoriaSelecionada.id);
@@ -251,6 +257,8 @@ export const ChecklistsAdminPage: React.FC = () => {
       );
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Não foi possível alterar o status do item.');
+    } finally {
+      setProcessandoItemId(null);
     }
   };
 
@@ -501,8 +509,9 @@ export const ChecklistsAdminPage: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    disabled={processandoCatToggle}
                     onClick={() => void handleToggleCategoriaAtiva(categoriaSelecionada)}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium disabled:opacity-60 ${
                       categoriaSelecionada.ativo
                         ? 'bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/30'
                         : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
@@ -825,8 +834,9 @@ export const ChecklistsAdminPage: React.FC = () => {
 
                             <button
                               type="button"
+                              disabled={processandoItemId === item.id}
                               onClick={() => void handleToggleItemAtivo(item)}
-                              className={`px-2.5 py-1 rounded-lg border text-xs font-medium ${
+                              className={`px-2.5 py-1 rounded-lg border text-xs font-medium disabled:opacity-60 ${
                                 item.ativo
                                   ? 'bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/30'
                                   : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'

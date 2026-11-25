@@ -161,27 +161,23 @@ const CATEGORIAS_SEED: SeedCategoria[] = [
 ];
 
 async function seedAdmin(): Promise<void> {
-  const email = process.env.SEED_ADMIN_EMAIL?.trim();
+  const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() || 'admin@benchos.local';
   const password = process.env.SEED_ADMIN_PASSWORD;
   const nome = process.env.SEED_ADMIN_NAME?.trim() || 'Administrador BenchOS';
 
-  if (!email || !password) {
-    throw new Error(
-      'Variáveis SEED_ADMIN_EMAIL e SEED_ADMIN_PASSWORD são obrigatórias para o seed.',
-    );
+  const existingAdmin = await prisma.user.findUnique({ where: { email } });
+  if (existingAdmin) {
+    return;
+  }
+
+  if (!password) {
+    throw new Error('Variável SEED_ADMIN_PASSWORD é obrigatória para o seed.');
   }
 
   const senhaHash = await bcrypt.hash(password, 10);
 
-  await prisma.user.upsert({
-    where: { email },
-    update: {
-      nome,
-      senhaHash,
-      role: 'ADMIN',
-      ativo: true,
-    },
-    create: {
+  await prisma.user.create({
+    data: {
       nome,
       email,
       senhaHash,
@@ -192,51 +188,28 @@ async function seedAdmin(): Promise<void> {
 }
 
 async function seedCategorias(): Promise<void> {
+  const existingCount = await prisma.categoria.count();
+  if (existingCount > 0) {
+    return;
+  }
+
   for (const catData of CATEGORIAS_SEED) {
-    const categoria = await prisma.categoria.upsert({
-      where: { nome: catData.nome },
-      update: {
-        icone: catData.icone,
-        instrucaoGeral: catData.instrucaoGeral,
-        ativo: true,
-      },
-      create: {
+    await prisma.categoria.create({
+      data: {
         nome: catData.nome,
         icone: catData.icone,
         instrucaoGeral: catData.instrucaoGeral,
         ativo: true,
-      },
-    });
-
-    for (const item of catData.itens) {
-      const existing = await prisma.itemChecklist.findFirst({
-        where: {
-          categoriaId: categoria.id,
-          ordem: item.ordem,
-        },
-      });
-
-      if (existing) {
-        await prisma.itemChecklist.update({
-          where: { id: existing.id },
-          data: {
-            descricao: item.descricao,
-            comoTestar: item.comoTestar,
-            ativo: true,
-          },
-        });
-      } else {
-        await prisma.itemChecklist.create({
-          data: {
-            categoriaId: categoria.id,
+        itens: {
+          create: catData.itens.map((item) => ({
             ordem: item.ordem,
             descricao: item.descricao,
             comoTestar: item.comoTestar,
             ativo: true,
-          },
-        });
-      }
-    }
+          })),
+        },
+      },
+    });
   }
 }
 

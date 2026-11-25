@@ -618,7 +618,7 @@ describe('Módulo triagens (/api/triagens)', () => {
 
       mockUserFindUnique.mockResolvedValueOnce(FUNCIONARIO_A);
       mockTriagemFindUnique.mockResolvedValueOnce(emAnalise);
-      mockCategoriaFindUnique.mockResolvedValueOnce({ id: 2, nome: 'Câmera Hikvision / HiLook' });
+      mockCategoriaFindUnique.mockResolvedValueOnce({ id: 2, nome: 'Câmera Hikvision / HiLook', ativo: true });
       mockTriagemRespostaCount.mockResolvedValueOnce(2);
 
       const res = await request(app)
@@ -639,7 +639,7 @@ describe('Módulo triagens (/api/triagens)', () => {
 
       mockUserFindUnique.mockResolvedValueOnce(FUNCIONARIO_A);
       mockTriagemFindUnique.mockResolvedValueOnce(emAnalise);
-      mockCategoriaFindUnique.mockResolvedValueOnce({ id: 2, nome: 'Câmera Hikvision / HiLook' });
+      mockCategoriaFindUnique.mockResolvedValueOnce({ id: 2, nome: 'Câmera Hikvision / HiLook', ativo: true });
       mockTriagemRespostaCount.mockResolvedValueOnce(2);
       mockTriagemRespostaDeleteMany.mockResolvedValueOnce({ count: 2 });
       mockTriagemUpdate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
@@ -1081,6 +1081,41 @@ describe('Módulo triagens (/api/triagens)', () => {
           create: expect.objectContaining({ resultado: 'NAO_TESTADO' }),
         }),
       );
+    });
+
+    it('rejeita 400 ao criar triagem em categoria inativa, mas permite editar OS existente mantendo categoria inativa', async () => {
+      mockUserFindUnique.mockResolvedValue(FUNCIONARIO_A);
+      mockClienteFindUnique.mockResolvedValueOnce({ id: 1, nome: 'Cliente OK' });
+      mockCategoriaFindUnique.mockResolvedValueOnce({ id: 5, nome: 'Legada', ativo: false });
+
+      const createInativaRes = await request(app)
+        .post('/api/triagens')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({
+          clienteId: 1,
+          categoriaId: 5,
+          modelo: 'Antigo',
+          fabricante: 'Marca X',
+          numeroSerieMac: 'LEG-001',
+          statusSelo: 'INTEGRO',
+          defeitoReclamado: 'Sem sinal',
+        });
+
+      expect(createInativaRes.status).toBe(400);
+      expect(mockTriagemCreate).not.toHaveBeenCalled();
+
+      const osCategoriaInativa = makeTriagemRecord({ id: 97, categoriaId: 5, status: 'PENDENTE' });
+      mockTriagemFindUnique.mockResolvedValueOnce(osCategoriaInativa);
+      mockCategoriaFindUnique.mockResolvedValueOnce({ id: 5, nome: 'Legada', ativo: false });
+      mockTriagemUpdate.mockResolvedValueOnce({ ...osCategoriaInativa, modelo: 'Antigo Rev2' });
+
+      const editMesmaCategoria = await request(app)
+        .patch('/api/triagens/97')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ categoriaId: 5, modelo: 'Antigo Rev2' });
+
+      expect(editMesmaCategoria.status).toBe(200);
+      expect(editMesmaCategoria.body.modelo).toBe('Antigo Rev2');
     });
   });
 });

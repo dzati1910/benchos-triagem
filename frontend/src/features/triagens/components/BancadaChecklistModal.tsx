@@ -100,6 +100,22 @@ export const BancadaChecklistModal: React.FC<BancadaChecklistModalProps> = ({
   const triagemRef = useRef(triagem);
   triagemRef.current = triagem;
 
+  const buildRespostasMap = (dados: TriagemDetalheResponse): Record<number, RespostaFormItem> => {
+    const respostasPorItemId = new Map(
+      dados.respostas.map((resp) => [resp.itemChecklistId, resp]),
+    );
+    const mapa: Record<number, RespostaFormItem> = {};
+    for (const item of dados.itensChecklist) {
+      const existente = respostasPorItemId.get(item.id);
+      mapa[item.id] = {
+        resultado: existente?.resultado ?? 'PENDENTE',
+        observacao: existente?.observacao ?? '',
+        respondidoPorNome: existente?.respondidoPor?.nome ?? null,
+      };
+    }
+    return mapa;
+  };
+
   const triagemId = triagem?.id ?? null;
 
   useEffect(() => {
@@ -127,19 +143,7 @@ export const BancadaChecklistModal: React.FC<BancadaChecklistModalProps> = ({
           return;
         }
 
-        const respostasPorItemId = new Map(
-          dados.respostas.map((resp) => [resp.itemChecklistId, resp]),
-        );
-
-        const mapaInicial: Record<number, RespostaFormItem> = {};
-        for (const item of dados.itensChecklist) {
-          const existente = respostasPorItemId.get(item.id);
-          mapaInicial[item.id] = {
-            resultado: existente?.resultado ?? 'PENDENTE',
-            observacao: existente?.observacao ?? '',
-            respondidoPorNome: existente?.respondidoPor?.nome ?? null,
-          };
-        }
+        const mapaInicial = buildRespostasMap(dados);
 
         setDetalhe(dados);
         setRespostas(mapaInicial);
@@ -366,6 +370,7 @@ export const BancadaChecklistModal: React.FC<BancadaChecklistModalProps> = ({
 
       const atualizado = await fetchTriagemDetalhe(detalhe.triagem.id);
       setDetalhe(atualizado);
+      setRespostas(buildRespostasMap(atualizado));
       setAvisoSucesso('Progresso salvo na bancada. Você pode retomar esta OS a qualquer momento.');
       onSaved();
     } catch (err) {
