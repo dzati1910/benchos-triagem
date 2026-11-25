@@ -1,5 +1,12 @@
-import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import dotenv from 'dotenv';
 import { z } from 'zod';
+
+if (!process.env.VITEST) {
+  const backendEnvPath = path.resolve(__dirname, '../../.env');
+  dotenv.config(fs.existsSync(backendEnvPath) ? { path: backendEnvPath } : undefined);
+}
 
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),

@@ -5,7 +5,11 @@ coverage/
 
 # Variáveis de ambiente e bancos locais
 .env
+.env.*
+!.env.example
 backend/.env
+backend/.env.*
+!backend/.env.example
 *.db
 postgres-data/
 

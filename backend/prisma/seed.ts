@@ -1,6 +1,11 @@
-import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
+
+const backendEnvPath = path.resolve(__dirname, '../.env');
+dotenv.config(fs.existsSync(backendEnvPath) ? { path: backendEnvPath } : undefined);
 
 const prisma = new PrismaClient();
 

@@ -14,14 +14,16 @@ O sistema segue **Monólito Modular** no backend e **SPA por features** no front
 sistema-triagem/
 ├── docker-compose.yml            # PostgreSQL 16 (container benchos-postgres)
 ├── .env.example                  # Variáveis de ambiente de referência (DB, JWT, Seed Admin)
-├── iniciar.sh                    # Script único: Docker + Postgres + Prisma + Backend + Frontend
+├── iniciar.sh                    # Modo desenvolvimento: Docker + Postgres + Prisma + Backend + Vite Dev
+├── iniciar-producao.sh           # Modo produção: Docker + Postgres + Prisma + Builds + servidor único
+├── scripts/                      # Funções auxiliares compartilhadas dos scripts de inicialização
 ├── backend/                      # API REST (Node.js + TypeScript + Express + Prisma)
 │   ├── prisma/
 │   │   ├── schema.prisma         # Modelos PostgreSQL (User, Cliente, Categoria, ItemChecklist, Triagem, TriagemResposta)
 │   │   ├── migrations/           # Histórico versionado de migrations
 │   │   └── seed.ts               # Admin inicial + 4 categorias e 18 itens de bancada
 │   └── src/
-│       ├── app.ts                # Configuração Express, CORS, /api/health e montagem dos módulos
+│       ├── app.ts                # Configuração Express, CORS, /api/health, rotas da API e SPA estática (prod)
 │       ├── server.ts             # Inicialização HTTP na porta PORT (padrão 3001)
 │       ├── config/env.ts         # Validação de variáveis de ambiente com Zod
 │       ├── lib/prisma.ts         # Instância singleton do PrismaClient
@@ -89,25 +91,44 @@ As credenciais do administrador inicial são lidas do arquivo `backend/.env` pel
 
 ## Como Iniciar o Sistema na Loja
 
-1. Instale as dependências (primeira execução):
-   ```bash
-   cd backend && npm install
-   cd ../frontend && npm install
-   ```
-2. Configure `backend/.env` (caso não exista, o `./iniciar.sh` copia o `.env.example` automaticamente).
-3. Execute o script raiz:
-   ```bash
-   ./iniciar.sh
-   ```
-   O script:
-   - Valida o Docker e sobe o PostgreSQL 16 (`docker compose up -d`);
-   - Aguarda o banco ficar saudável (`pg_isready`);
-   - Executa `npx prisma migrate deploy` e `npx prisma db seed`;
-   - Inicia o Backend (`:3001`) e o Frontend (`:3000` em `0.0.0.0`).
+### 1. Pré-requisitos (primeira execução)
 
-4. Acesse:
-   - **No servidor:** `http://localhost:3000`
-   - **De outros PCs na rede local:** `http://[IP_DO_SERVIDOR]:3000`
+```bash
+cd backend && npm install
+cd ../frontend && npm install
+```
+
+Configure `backend/.env` (caso não exista, os scripts copiam o `.env.example` automaticamente). Para rodar em produção na loja, defina um `JWT_SECRET` forte e troque a senha do administrador padrão.
+
+### 2. Modo Produção (Recomendado para testar liso ou rodar na loja)
+
+Em produção, o frontend é compilado em arquivos estáticos (`frontend/dist`) e servido diretamente pelo próprio backend Node.js em uma única porta (padrão `3001`, configurável via `PORT` no `backend/.env`), sem peso de hot-reload:
+
+```bash
+./iniciar-producao.sh
+```
+
+Para manter o servidor ativo em segundo plano mesmo após fechar o terminal (usando PM2):
+
+```bash
+# Após rodar os builds e migrations uma vez:
+cd backend
+NODE_ENV=production pm2 start dist/server.js --name benchos
+pm2 save
+pm2 startup
+```
+
+Acesse:
+- **No servidor:** `http://localhost:3001` (ou na `PORT` configurada no `backend/.env`)
+- **De outros PCs na rede local:** `http://[IP_DO_SERVIDOR]:3001`
+
+### 3. Modo Desenvolvimento (Para programar com recarga automática)
+
+```bash
+./iniciar.sh
+```
+
+O script valida o Docker, sobe o PostgreSQL 16, aplica migrations/seed e inicia Backend (`:3001`) e Vite Dev Server (`:3000` em `0.0.0.0`). Acesse em `http://localhost:3000`.
 
 ---
 
