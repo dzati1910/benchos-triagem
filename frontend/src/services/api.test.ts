@@ -3,8 +3,12 @@ import {
   AUTH_TOKEN_STORAGE_KEY,
   apiFetch,
   clearAuthToken,
+  concluirTriagem,
+  iniciarAnaliseTriagem,
   loginRequest,
+  reabrirTriagem,
   registerUnauthorizedHandler,
+  salvarProgressoTriagem,
   setAuthToken,
 } from './api';
 
@@ -88,5 +92,39 @@ describe('services/api', () => {
       'E-mail ou senha inválidos.',
     );
     expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('envia PATCH corretamente para iniciar, salvar progresso, concluir e reabrir triagem', async () => {
+    setAuthToken('jwt-teste-123');
+    const okJson = () =>
+      new Response(JSON.stringify({ id: 10 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+    fetchMock
+      .mockResolvedValueOnce(okJson())
+      .mockResolvedValueOnce(okJson())
+      .mockResolvedValueOnce(okJson())
+      .mockResolvedValueOnce(okJson());
+
+    await iniciarAnaliseTriagem(10);
+    await salvarProgressoTriagem(10, {
+      respostas: [{ itemChecklistId: 1, resultado: 'APROVADO', observacao: 'OK' }],
+    });
+    await concluirTriagem(10, {
+      diagnosticoFinal: 'OPERACIONAL',
+      parecerTecnico: 'Sem defeitos',
+      resumoCliente: 'Tudo ok',
+      respostas: [{ itemChecklistId: 1, resultado: 'APROVADO', observacao: 'OK' }],
+    });
+    await reabrirTriagem(10);
+
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, (init as RequestInit).method])).toEqual([
+      ['/api/triagens/10/iniciar', 'PATCH'],
+      ['/api/triagens/10/progresso', 'PATCH'],
+      ['/api/triagens/10/concluir', 'PATCH'],
+      ['/api/triagens/10/reabrir', 'PATCH'],
+    ]);
   });
 });

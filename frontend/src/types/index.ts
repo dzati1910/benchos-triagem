@@ -109,6 +109,10 @@ export interface TriagemDetalheResponse {
   respostas: TriagemResposta[];
 }
 
+export interface TriagemComRespostas extends Triagem {
+  respostas?: TriagemResposta[];
+}
+
 export type ReincidenciaItem = Triagem;
 
 export interface LoginResponse {

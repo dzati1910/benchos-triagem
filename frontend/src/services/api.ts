@@ -1,12 +1,15 @@
 import type {
   Categoria,
   Cliente,
+  DiagnosticoFinal,
   LoginResponse,
   MeResponse,
   ReincidenciaItem,
+  ResultadoItemChecklist,
   StatusSelo,
   StatusTriagem,
   Triagem,
+  TriagemComRespostas,
   TriagemDetalheResponse,
 } from '../types';
 
@@ -128,6 +131,26 @@ export interface CreateClientePayload {
   documento?: string | null;
 }
 
+export interface RespostaChecklistPayload {
+  itemChecklistId: number;
+  resultado: ResultadoItemChecklist;
+  observacao?: string | null;
+}
+
+export interface SalvarProgressoPayload {
+  respostas?: RespostaChecklistPayload[];
+  diagnosticoFinal?: DiagnosticoFinal | null;
+  parecerTecnico?: string | null;
+  resumoCliente?: string | null;
+}
+
+export interface ConcluirTriagemPayload {
+  diagnosticoFinal: DiagnosticoFinal;
+  parecerTecnico?: string | null;
+  resumoCliente?: string | null;
+  respostas?: RespostaChecklistPayload[];
+}
+
 export function fetchTriagens(params: ListTriagensParams = {}): Promise<Triagem[]> {
   const search = new URLSearchParams();
   if (params.status) {
@@ -174,6 +197,38 @@ export function editarTriagem(id: number, data: UpdateTriagemPayload): Promise<T
 
 export function cancelarTriagem(id: number): Promise<Triagem> {
   return apiFetch<Triagem>(`/triagens/${id}/cancelar`, {
+    method: 'PATCH',
+  });
+}
+
+export function iniciarAnaliseTriagem(id: number): Promise<Triagem> {
+  return apiFetch<Triagem>(`/triagens/${id}/iniciar`, {
+    method: 'PATCH',
+  });
+}
+
+export function salvarProgressoTriagem(
+  id: number,
+  data: SalvarProgressoPayload,
+): Promise<TriagemComRespostas> {
+  return apiFetch<TriagemComRespostas>(`/triagens/${id}/progresso`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export function concluirTriagem(
+  id: number,
+  data: ConcluirTriagemPayload,
+): Promise<TriagemComRespostas> {
+  return apiFetch<TriagemComRespostas>(`/triagens/${id}/concluir`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export function reabrirTriagem(id: number): Promise<Triagem> {
+  return apiFetch<Triagem>(`/triagens/${id}/reabrir`, {
     method: 'PATCH',
   });
 }
