@@ -1,0 +1,19 @@
+# Dependências e builds
+node_modules/
+dist/
+coverage/
+
+# Variáveis de ambiente e bancos locais
+.env
+backend/.env
+*.db
+postgres-data/
+
+# Sistema / IDE
+.DS_Store
+*.log
+
+# Worktrees e scratch local do Superpowers
+.worktrees/
+.superpowers/
+
