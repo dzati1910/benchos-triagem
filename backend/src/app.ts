@@ -5,6 +5,7 @@ import { prisma } from './lib/prisma';
 import { authRouter } from './modules/auth/auth.routes';
 import { categoriasRouter } from './modules/categorias/categorias.routes';
 import { clientesRouter } from './modules/clientes/clientes.routes';
+import { triagensRouter } from './modules/triagens/triagens.routes';
 import { usersRouter } from './modules/users/users.routes';
 import { errorHandler } from './shared/middlewares/errorHandler';
 
@@ -26,5 +27,6 @@ app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/clientes', clientesRouter);
 app.use('/api/categorias', categoriasRouter);
+app.use('/api/triagens', triagensRouter);
 
 app.use(errorHandler);
