@@ -2,10 +2,13 @@ import type {
   Categoria,
   Cliente,
   DiagnosticoFinal,
+  ItemChecklist,
   LoginResponse,
   MeResponse,
+  PublicUser,
   ReincidenciaItem,
   ResultadoItemChecklist,
+  Role,
   StatusSelo,
   StatusTriagem,
   Triagem,
@@ -247,6 +250,111 @@ export function fetchClientes(busca?: string): Promise<Cliente[]> {
 export function criarCliente(data: CreateClientePayload): Promise<Cliente> {
   return apiFetch<Cliente>('/clientes', {
     method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export interface CreateUsuarioPayload {
+  nome: string;
+  email: string;
+  senha: string;
+  role: Role;
+}
+
+export interface UpdateUsuarioPayload {
+  nome?: string;
+  role?: Role;
+  ativo?: boolean;
+}
+
+export interface CreateCategoriaPayload {
+  nome: string;
+  icone: string;
+  instrucaoGeral?: string | null;
+}
+
+export interface UpdateCategoriaPayload {
+  nome?: string;
+  icone?: string;
+  instrucaoGeral?: string | null;
+  ativo?: boolean;
+}
+
+export interface CreateItemChecklistPayload {
+  descricao: string;
+  comoTestar: string;
+  ordem?: number;
+}
+
+export interface UpdateItemChecklistPayload {
+  descricao?: string;
+  comoTestar?: string;
+  ordem?: number;
+  ativo?: boolean;
+}
+
+export function fetchUsers(): Promise<PublicUser[]> {
+  return apiFetch<PublicUser[]>('/users');
+}
+
+export function criarUsuario(data: CreateUsuarioPayload): Promise<PublicUser> {
+  return apiFetch<PublicUser>('/users', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function atualizarUsuario(id: number, data: UpdateUsuarioPayload): Promise<PublicUser> {
+  return apiFetch<PublicUser>(`/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export function redefinirSenhaUsuario(id: number, novaSenha: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(`/users/${id}/senha`, {
+    method: 'PATCH',
+    body: JSON.stringify({ novaSenha }),
+  });
+}
+
+export function fetchCategoriasAdmin(): Promise<Categoria[]> {
+  return fetchCategorias(true);
+}
+
+export function criarCategoria(data: CreateCategoriaPayload): Promise<Categoria> {
+  return apiFetch<Categoria>('/categorias', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function atualizarCategoria(
+  id: number,
+  data: UpdateCategoriaPayload,
+): Promise<Categoria> {
+  return apiFetch<Categoria>(`/categorias/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export function criarItemChecklist(
+  categoriaId: number,
+  data: CreateItemChecklistPayload,
+): Promise<ItemChecklist> {
+  return apiFetch<ItemChecklist>(`/categorias/${categoriaId}/itens`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function atualizarItemChecklist(
+  itemId: number,
+  data: UpdateItemChecklistPayload,
+): Promise<ItemChecklist> {
+  return apiFetch<ItemChecklist>(`/categorias/itens/${itemId}`, {
+    method: 'PATCH',
     body: JSON.stringify(data),
   });
 }

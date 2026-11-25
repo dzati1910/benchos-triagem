@@ -2,11 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTH_TOKEN_STORAGE_KEY,
   apiFetch,
+  atualizarCategoria,
+  atualizarItemChecklist,
+  atualizarUsuario,
   clearAuthToken,
   concluirTriagem,
+  criarCategoria,
+  criarItemChecklist,
+  criarUsuario,
+  fetchCategoriasAdmin,
+  fetchUsers,
   iniciarAnaliseTriagem,
   loginRequest,
   reabrirTriagem,
+  redefinirSenhaUsuario,
   registerUnauthorizedHandler,
   salvarProgressoTriagem,
   setAuthToken,
@@ -125,6 +134,41 @@ describe('services/api', () => {
       ['/api/triagens/10/progresso', 'PATCH'],
       ['/api/triagens/10/concluir', 'PATCH'],
       ['/api/triagens/10/reabrir', 'PATCH'],
+    ]);
+  });
+
+  it('envia endpoints administrativos de usuários e categorias/itens corretamente', async () => {
+    setAuthToken('jwt-admin');
+    const okJson = () =>
+      new Response(JSON.stringify({ id: 1 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+    for (let i = 0; i < 9; i += 1) {
+      fetchMock.mockResolvedValueOnce(okJson());
+    }
+
+    await fetchUsers();
+    await criarUsuario({ nome: 'Tech', email: 't@b.local', senha: '123456', role: 'FUNCIONARIO' });
+    await atualizarUsuario(2, { ativo: false });
+    await redefinirSenhaUsuario(2, 'nova123');
+    await fetchCategoriasAdmin();
+    await criarCategoria({ nome: 'NVR', icone: 'Server', instrucaoGeral: null });
+    await atualizarCategoria(3, { ativo: false });
+    await criarItemChecklist(3, { descricao: 'Boot', comoTestar: 'Ligar na bancada', ordem: 1 });
+    await atualizarItemChecklist(9, { ativo: false });
+
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, (init as RequestInit).method ?? 'GET'])).toEqual([
+      ['/api/users', 'GET'],
+      ['/api/users', 'POST'],
+      ['/api/users/2', 'PATCH'],
+      ['/api/users/2/senha', 'PATCH'],
+      ['/api/categorias?incluirInativos=true', 'GET'],
+      ['/api/categorias', 'POST'],
+      ['/api/categorias/3', 'PATCH'],
+      ['/api/categorias/3/itens', 'POST'],
+      ['/api/categorias/itens/9', 'PATCH'],
     ]);
   });
 });
