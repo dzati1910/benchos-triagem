@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  FUNCIONARIO
+}
+
+enum StatusSelo {
+  INTEGRO
+  VIOLADO
+  SEM_SELO
+}
+
+enum StatusTriagem {
+  PENDENTE
+  EM_ANALISE
+  CONCLUIDA
+  CANCELADA
+}
+
+enum DiagnosticoFinal {
+  OPERACIONAL
+  DEFEITO_FABRICA
+  ENCAMINHAR_ESPECIALISTA
+  SEM_GARANTIA
+}
+
+enum ResultadoItemChecklist {
+  PENDENTE
+  APROVADO
+  REPROVADO
+  NAO_TESTADO
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  nome         String
+  email        String   @unique
+  senhaHash    String
+  role         Role     @default(FUNCIONARIO)
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  triagensRecebidas   Triagem[]         @relation("TriagensRecebidas")
+  triagensIniciadas   Triagem[]         @relation("TriagensIniciadas")
+  triagensConcluidas  Triagem[]         @relation("TriagensConcluidas")
+  triagensCanceladas  Triagem[]         @relation("TriagensCanceladas")
+  triagensAtualizadas Triagem[]         @relation("TriagensAtualizadas")
+  respostasChecklist  TriagemResposta[]
+}
+
+model Cliente {
+  id        Int       @id @default(autoincrement())
+  nome      String
+  telefone  String?
+  documento String?
+  criadoEm  DateTime  @default(now())
+  triagens  Triagem[]
+}
+
+model Categoria {
+  id             Int             @id @default(autoincrement())
+  nome           String          @unique
+  icone          String
+  instrucaoGeral String?
+  ativo          Boolean         @default(true)
+  itens          ItemChecklist[]
+  triagens       Triagem[]
+}
+
+model ItemChecklist {
+  id          Int               @id @default(autoincrement())
+  categoriaId Int
+  categoria   Categoria         @relation(fields: [categoriaId], references: [id])
+  descricao   String
+  comoTestar  String
+  ordem       Int
+  ativo       Boolean           @default(true)
+  respostas   TriagemResposta[]
+
+  @@index([categoriaId, ordem])
+}
+
+model Triagem {
+  id                     Int               @id @default(autoincrement())
+  clienteId              Int
+  cliente                Cliente           @relation(fields: [clienteId], references: [id])
+  categoriaId            Int
+  categoria              Categoria         @relation(fields: [categoriaId], references: [id])
+  recebidoPorId          Int
+  recebidoPor            User              @relation("TriagensRecebidas", fields: [recebidoPorId], references: [id])
+  analiseIniciadaPorId   Int?
+  analiseIniciadaPor     User?             @relation("TriagensIniciadas", fields: [analiseIniciadaPorId], references: [id])
+  concluidoPorId         Int?
+  concluidoPor           User?             @relation("TriagensConcluidas", fields: [concluidoPorId], references: [id])
+  canceladoPorId         Int?
+  canceladoPor           User?             @relation("TriagensCanceladas", fields: [canceladoPorId], references: [id])
+  ultimaAtualizacaoPorId Int?
+  ultimaAtualizacaoPor   User?             @relation("TriagensAtualizadas", fields: [ultimaAtualizacaoPorId], references: [id])
+  modelo                 String
+  fabricante             String
+  numeroSerieMac         String
+  statusSelo             StatusSelo
+  observacaoSelo         String?
+  defeitoReclamado       String
+  acessoriosInclusos     String?
+  status                 StatusTriagem     @default(PENDENTE)
+  diagnosticoFinal       DiagnosticoFinal?
+  parecerTecnico         String?
+  resumoCliente          String?
+  criadoEm               DateTime          @default(now())
+  analiseIniciadaEm      DateTime?
+  concluidoEm            DateTime?
+  canceladoEm            DateTime?
+  atualizadoEm           DateTime          @updatedAt
+  respostas              TriagemResposta[]
+
+  @@index([numeroSerieMac])
+}
+
+model TriagemResposta {
+  id              Int                    @id @default(autoincrement())
+  triagemId       Int
+  triagem         Triagem                @relation(fields: [triagemId], references: [id], onDelete: Cascade)
+  itemChecklistId Int
+  itemChecklist   ItemChecklist          @relation(fields: [itemChecklistId], references: [id])
+  resultado       ResultadoItemChecklist @default(PENDENTE)
+  observacao      String?
+  respondidoPorId Int?
+  respondidoPor   User?                  @relation(fields: [respondidoPorId], references: [id])
+  atualizadoEm    DateTime               @updatedAt
+
+  @@unique([triagemId, itemChecklistId])
+}
