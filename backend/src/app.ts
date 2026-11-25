@@ -3,6 +3,8 @@ import cors from 'cors';
 import express, { type Express } from 'express';
 import { prisma } from './lib/prisma';
 import { authRouter } from './modules/auth/auth.routes';
+import { categoriasRouter } from './modules/categorias/categorias.routes';
+import { clientesRouter } from './modules/clientes/clientes.routes';
 import { usersRouter } from './modules/users/users.routes';
 import { errorHandler } from './shared/middlewares/errorHandler';
 
@@ -22,5 +24,7 @@ app.get('/api/health', async (_req, res, next) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/clientes', clientesRouter);
+app.use('/api/categorias', categoriasRouter);
 
 app.use(errorHandler);
