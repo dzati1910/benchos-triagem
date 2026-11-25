@@ -1,6 +1,9 @@
+import './config/env';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import { prisma } from './lib/prisma';
+import { authRouter } from './modules/auth/auth.routes';
+import { usersRouter } from './modules/users/users.routes';
 import { errorHandler } from './shared/middlewares/errorHandler';
 
 export const app: Express = express();
@@ -16,5 +19,8 @@ app.get('/api/health', async (_req, res, next) => {
     next(error);
   }
 });
+
+app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
 
 app.use(errorHandler);
