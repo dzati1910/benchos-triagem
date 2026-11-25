@@ -1,4 +1,14 @@
-import type { LoginResponse, MeResponse } from '../types';
+import type {
+  Categoria,
+  Cliente,
+  LoginResponse,
+  MeResponse,
+  ReincidenciaItem,
+  StatusSelo,
+  StatusTriagem,
+  Triagem,
+  TriagemDetalheResponse,
+} from '../types';
 
 export const API_BASE = '/api';
 export const AUTH_TOKEN_STORAGE_KEY = 'benchos_token';
@@ -88,4 +98,100 @@ export function loginRequest(email: string, senha: string): Promise<LoginRespons
 
 export function fetchMeRequest(): Promise<MeResponse> {
   return apiFetch<MeResponse>('/auth/me');
+}
+
+export interface ListTriagensParams {
+  status?: StatusTriagem;
+  busca?: string;
+  incluirCanceladas?: boolean;
+}
+
+export interface CreateTriagemPayload {
+  clienteId: number;
+  categoriaId: number;
+  modelo: string;
+  fabricante: string;
+  numeroSerieMac: string;
+  statusSelo: StatusSelo;
+  observacaoSelo?: string | null;
+  defeitoReclamado: string;
+  acessoriosInclusos?: string | null;
+}
+
+export interface UpdateTriagemPayload extends Partial<CreateTriagemPayload> {
+  limparRespostasAnteriores?: boolean;
+}
+
+export interface CreateClientePayload {
+  nome: string;
+  telefone?: string | null;
+  documento?: string | null;
+}
+
+export function fetchTriagens(params: ListTriagensParams = {}): Promise<Triagem[]> {
+  const search = new URLSearchParams();
+  if (params.status) {
+    search.set('status', params.status);
+  }
+  if (params.busca?.trim()) {
+    search.set('busca', params.busca.trim());
+  }
+  if (params.incluirCanceladas) {
+    search.set('incluirCanceladas', 'true');
+  }
+  const qs = search.toString();
+  return apiFetch<Triagem[]>(qs ? `/triagens?${qs}` : '/triagens');
+}
+
+export function fetchReincidenciaSerial(
+  serial: string,
+  excluirTriagemId?: number,
+): Promise<ReincidenciaItem[]> {
+  const search = new URLSearchParams({ serial: serial.trim() });
+  if (excluirTriagemId !== undefined) {
+    search.set('excluirTriagemId', String(excluirTriagemId));
+  }
+  return apiFetch<ReincidenciaItem[]>(`/triagens/reincidencia?${search.toString()}`);
+}
+
+export function fetchTriagemDetalhe(id: number): Promise<TriagemDetalheResponse> {
+  return apiFetch<TriagemDetalheResponse>(`/triagens/${id}`);
+}
+
+export function criarTriagem(data: CreateTriagemPayload): Promise<Triagem> {
+  return apiFetch<Triagem>('/triagens', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function editarTriagem(id: number, data: UpdateTriagemPayload): Promise<Triagem> {
+  return apiFetch<Triagem>(`/triagens/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export function cancelarTriagem(id: number): Promise<Triagem> {
+  return apiFetch<Triagem>(`/triagens/${id}/cancelar`, {
+    method: 'PATCH',
+  });
+}
+
+export function fetchCategorias(incluirInativos = false): Promise<Categoria[]> {
+  const path = incluirInativos ? '/categorias?incluirInativos=true' : '/categorias';
+  return apiFetch<Categoria[]>(path);
+}
+
+export function fetchClientes(busca?: string): Promise<Cliente[]> {
+  const trimmed = busca?.trim();
+  const path = trimmed ? `/clientes?busca=${encodeURIComponent(trimmed)}` : '/clientes';
+  return apiFetch<Cliente[]>(path);
+}
+
+export function criarCliente(data: CreateClientePayload): Promise<Cliente> {
+  return apiFetch<Cliente>('/clientes', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }

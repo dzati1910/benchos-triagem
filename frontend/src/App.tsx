@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { AuthProvider } from './contexts/AuthContext';
 import { LoginPage } from './features/auth/LoginPage';
+import { TriagensDashboardPage } from './features/triagens/TriagensDashboardPage';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 
 const PlaceholderPage: React.FC<{ title: string; description: string }> = ({
@@ -24,15 +25,7 @@ export const App: React.FC = () => {
 
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
-              <Route
-                path="/triagens"
-                element={
-                  <PlaceholderPage
-                    title="Triagens na Bancada"
-                    description="Painel de triagens técnicas em preparação."
-                  />
-                }
-              />
+              <Route path="/triagens" element={<TriagensDashboardPage />} />
 
               <Route element={<ProtectedRoute roles={['ADMIN']} />}>
                 <Route
