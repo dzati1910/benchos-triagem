@@ -1,0 +1,17 @@
+**/node_modules
+**/dist
+**/coverage
+.git
+.gitignore
+.env*
+**/.env*
+*.db
+*.log
+*.heapprofile
+.DS_Store
+.obsidian
+.superpowers
+.worktrees
+postgres-data
+scratch
+**/scratch
