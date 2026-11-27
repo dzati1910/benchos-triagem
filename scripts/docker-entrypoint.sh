@@ -8,6 +8,8 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
+cd /app
+
 echo "[BenchOS Container] Aguardando conectividade com o banco de dados..."
 MAX_TRIES=30
 TRIES=0
