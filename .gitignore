@@ -16,6 +16,8 @@ postgres-data/
 # Sistema / IDE
 .DS_Store
 *.log
+*.heapprofile
+.obsidian/
 
 # Worktrees e scratch local do Superpowers
 .worktrees/
