@@ -12,11 +12,19 @@ O sistema segue **Monólito Modular** no backend e **SPA por features** no front
 
 ```text
 sistema-triagem/
-├── docker-compose.yml            # PostgreSQL 16 (container benchos-postgres)
-├── .env.example                  # Variáveis de ambiente de referência (DB, JWT, Seed Admin)
+├── .github/workflows/ci.yml      # CI/CD: testes e builds (backend/frontend) + Docker build check
+├── Dockerfile                    # Build multi-stage (Frontend Vite + Backend TS/Prisma + Runner Alpine)
+├── .dockerignore                 # Exclusões do contexto de build Docker
+├── docker-compose.yml            # PostgreSQL 16 para desenvolvimento local (container benchos-postgres)
+├── docker-compose.prod.yml       # Orquestração de produção isolada (benchos-postgres-prod + benchos-app-prod)
+├── .env.example                  # Variáveis de ambiente de referência (DB, JWT, Seed Admin, Porta)
 ├── iniciar.sh                    # Modo desenvolvimento: Docker + Postgres + Prisma + Backend + Vite Dev
-├── iniciar-producao.sh           # Modo produção: Docker + Postgres + Prisma + Builds + servidor único
-├── scripts/                      # Funções auxiliares compartilhadas dos scripts de inicialização
+├── iniciar-producao.sh           # Modo produção híbrido (host): Postgres Docker + Builds + servidor único
+├── atualizar-servidor.sh         # Atualização segura em produção (git pull + rebuild + healthcheck + rollback)
+├── scripts/
+│   ├── benchos-common.sh         # Funções auxiliares compartilhadas dos scripts de inicialização local
+│   ├── docker-entrypoint.sh      # Entrypoint do container: aguarda Postgres, aplica migrations/seed e inicia API
+│   └── test-prod-container.sh    # Smoke test E2E isolado da stack Docker de produção (porta 3099)
 ├── backend/                      # API REST (Node.js + TypeScript + Express + Prisma)
 │   ├── prisma/
 │   │   ├── schema.prisma         # Modelos PostgreSQL (User, Cliente, Categoria, ItemChecklist, Triagem, TriagemResposta)
@@ -79,52 +87,87 @@ Após adicionar o usuário ao grupo `docker`, **encerre a sessão e faça login 
 
 O sistema opera com **login fechado**: não existe auto-cadastro público. Apenas usuários com papel `ADMIN` podem cadastrar novos funcionários, alterar papéis (`ADMIN` / `FUNCIONARIO`), ativar/desativar contas e redefinir senhas em `/admin/usuarios` (com proteção contra auto-desativação ou auto-rebaixamento da própria conta logada).
 
-As credenciais do administrador inicial são lidas do arquivo `backend/.env` pelo `prisma/seed.ts`:
+As credenciais do administrador inicial são lidas pelo `prisma/seed.ts` a partir das variáveis de ambiente (`.env` na raiz para Docker em produção, ou `backend/.env` nos modos híbrido/desenvolvimento):
 
 - `SEED_ADMIN_EMAIL` (padrão no `.env.example`: `admin@benchos.local`)
 - `SEED_ADMIN_PASSWORD` (padrão no `.env.example`: `Admin@123`)
 - `JWT_SECRET` (segredo de assinatura JWT com mínimo de 16 caracteres)
 
-> **Aviso de Segurança:** Antes de colocar em produção na loja, **troque obrigatoriamente** `JWT_SECRET` e `SEED_ADMIN_PASSWORD` em `backend/.env` (ou redefina a senha do administrador após o primeiro login).
+> **Aviso de Segurança:** Antes de colocar em produção na loja, **troque obrigatoriamente** `JWT_SECRET`, `POSTGRES_PASSWORD` e `SEED_ADMIN_PASSWORD` no `.env` (ou `backend/.env`), ou redefina a senha do administrador após o primeiro login.
 
 ---
 
 ## Como Iniciar o Sistema na Loja
 
-### 1. Pré-requisitos (primeira execução)
+### 1. Modo Produção Containerizada (Docker Compose — Recomendado para o Servidor)
+
+A stack de produção executa a aplicação (`benchos-app-prod`) e o banco PostgreSQL 16 (`benchos-postgres-prod`) totalmente containerizados via `docker-compose.prod.yml`:
+
+- **Isolamento do banco de dados:** O PostgreSQL roda apenas na rede interna Docker `benchos_internal`, **sem expor a porta `5432` para o host ou para a LAN**, persistindo os dados no volume `benchos_pgdata_prod`.
+- **Migrations e seed automáticos:** O `scripts/docker-entrypoint.sh` aguarda o PostgreSQL ficar acessível, executa `prisma migrate deploy` e garante o `prisma db seed` idempotente antes de subir o servidor Node.js (API + SPA estática do frontend em uma única porta).
+
+1. Configure o arquivo `.env` na raiz do projeto:
+
+```bash
+cp .env.example .env
+# Edite .env e defina senhas fortes para POSTGRES_PASSWORD, JWT_SECRET e SEED_ADMIN_PASSWORD
+# (Opcional) Ajuste PORT=3001 caso deseje publicar em outra porta no servidor
+```
+
+2. Suba a stack de produção (build multi-stage + containers em segundo plano):
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+3. Acesse o sistema:
+- **No servidor:** `http://localhost:3001` (ou na `PORT` configurada no `.env`)
+- **De outros PCs na rede local:** `http://[IP_DO_SERVIDOR]:3001`
+
+#### Atualização Segura e Rollback no Servidor
+
+Para atualizar o servidor da loja com segurança a partir de `origin/main`:
+
+```bash
+./atualizar-servidor.sh
+```
+
+O script verifica se o repositório está limpo e na branch `main`, salva o commit atual (`PREV_COMMIT`), executa `git pull origin main`, reconstroi os containers com `docker compose -f docker-compose.prod.yml up -d --build` e monitora `http://localhost:${PORT}/api/health` por até 45 segundos. Se o build ou o healthcheck falhar, ele exibe os logs do container `app` e oferece (ou executa automaticamente com `--auto-rollback` ou `AUTO_ROLLBACK=1`) o rollback para `PREV_COMMIT`.
+
+#### Smoke Test Isolado do Container de Produção
+
+Para validar a imagem Docker de produção ponta a ponta sem afetar o banco principal:
+
+```bash
+./scripts/test-prod-container.sh
+```
+
+O script sobe um projeto Compose isolado (`benchos-smoke`) na porta `3099` (configurável via `SMOKE_PORT`) com banco descartável, valida `/api/health`, rotas da SPA (`/` e `/admin/usuarios`) e erro `404` da API, removendo todos os containers e volumes temporários ao final.
+
+### 2. Modo Produção Híbrido (Host Node.js + Postgres Docker)
+
+Caso prefira rodar o Node.js diretamente no host (sem container para a aplicação):
 
 ```bash
 cd backend && npm install
 cd ../frontend && npm install
-```
-
-Configure `backend/.env` (caso não exista, os scripts copiam o `.env.example` automaticamente). Para rodar em produção na loja, defina um `JWT_SECRET` forte e troque a senha do administrador padrão.
-
-### 2. Modo Produção (Recomendado para testar liso ou rodar na loja)
-
-Em produção, o frontend é compilado em arquivos estáticos (`frontend/dist`) e servido diretamente pelo próprio backend Node.js em uma única porta (padrão `3001`, configurável via `PORT` no `backend/.env`), sem peso de hot-reload:
-
-```bash
 ./iniciar-producao.sh
 ```
 
-Para manter o servidor ativo em segundo plano mesmo após fechar o terminal (usando PM2):
+O script prepara `backend/.env`, sobe o PostgreSQL de `docker-compose.yml`, compila `frontend/dist` e `backend/dist` e inicia o servidor único na porta configurada (`3001` por padrão). Para manter ativo em segundo plano com PM2:
 
 ```bash
-# Após rodar os builds e migrations uma vez:
 cd backend
 NODE_ENV=production pm2 start dist/server.js --name benchos
 pm2 save
 pm2 startup
 ```
 
-Acesse:
-- **No servidor:** `http://localhost:3001` (ou na `PORT` configurada no `backend/.env`)
-- **De outros PCs na rede local:** `http://[IP_DO_SERVIDOR]:3001`
-
 ### 3. Modo Desenvolvimento (Para programar com recarga automática)
 
 ```bash
+cd backend && npm install
+cd ../frontend && npm install
 ./iniciar.sh
 ```
 
@@ -134,7 +177,7 @@ O script valida o Docker, sobe o PostgreSQL 16, aplica migrations/seed e inicia 
 
 ## Comandos Úteis de Banco, Testes e Build
 
-### Testes e Builds
+### Testes, Builds e CI/CD
 
 ```bash
 # Backend (Vitest + build TypeScript)
@@ -143,6 +186,8 @@ cd backend && npm test && npm run build
 # Frontend (Vitest + build Vite)
 cd frontend && npm test && npm run build
 ```
+
+O pipeline em [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa automaticamente os testes e builds do backend e do frontend e valida o build multi-stage da imagem Docker (`Dockerfile`) em cada `push` ou `pull_request` para `main`.
 
 ### Banco de Dados (Prisma + Docker)
 
