@@ -18,27 +18,33 @@ RUN npm run build
 
 # Stage 3: Lean Production Runner
 FROM node:20-alpine AS runner
-RUN apk add --no-cache openssl libc6-compat curl bash
+RUN apk add --no-cache openssl libc6-compat curl bash \
+    && npm install -g tsx@4.23.15 \
+    && npm cache clean --force \
+    && rm -rf /root/.npm \
+    && mkdir -p /app/backend /app/scripts /home/node/.npm /home/node/.cache \
+    && chown -R node:node /app /home/node
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3001
 
-COPY backend/package*.json ./backend/
-RUN cd backend && npm ci --omit=dev && npm install --no-save prisma@6.19.3 && npm install -g tsx@4.23.15
-
-COPY --from=backend-builder /build/backend/dist ./backend/dist
-COPY --from=backend-builder /build/backend/prisma ./backend/prisma
-COPY --from=frontend-builder /build/frontend/dist ./frontend/dist
-
-RUN cd backend && npx prisma generate
-
-COPY scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
-RUN chmod +x ./scripts/docker-entrypoint.sh \
-    && mkdir -p /home/node/.npm /home/node/.cache \
-    && chown -R node:node /app /home/node/.npm /home/node/.cache
-
+COPY --chown=node:node backend/package*.json ./backend/
 USER node
+
+RUN cd backend \
+    && npm ci --omit=dev \
+    && npm install --no-save prisma@6.19.3 \
+    && npm cache clean --force \
+    && rm -rf /home/node/.npm/_cacache
+
+COPY --from=backend-builder --chown=node:node /build/backend/dist ./backend/dist
+COPY --from=backend-builder --chown=node:node /build/backend/prisma ./backend/prisma
+COPY --from=frontend-builder --chown=node:node /build/frontend/dist ./frontend/dist
+COPY --chown=node:node scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
+
+RUN chmod +x ./scripts/docker-entrypoint.sh \
+    && cd backend && npx --no-install prisma generate
 
 EXPOSE 3001
 

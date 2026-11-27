@@ -63,7 +63,7 @@ resolve_port() {
   if [ -z "$port" ]; then
     port="$(read_env_var "$SCRIPT_DIR/.env" "PORT")"
   fi
-  if [ -z "$port" ]; then
+  if [ -z "$port" ] && [ ! -f "$SCRIPT_DIR/.env" ] && [ -f "$SCRIPT_DIR/backend/.env" ]; then
     port="$(read_env_var "$SCRIPT_DIR/backend/.env" "PORT")"
   fi
   echo "${port:-3001}"
@@ -93,6 +93,13 @@ wait_for_health() {
   done
 }
 
+for cmd in git docker curl; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo -e "${RED}${BOLD}Erro: comando obrigatório '$cmd' não encontrado.${NC}" >&2
+    exit 1
+  fi
+done
+
 # Verificar working tree limpo antes de qualquer outra ação
 if [ -n "$(git status --porcelain)" ]; then
   echo -e "${RED}${BOLD}Erro: o repositório possui alterações locais não commitadas.${NC}" >&2
@@ -114,13 +121,6 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
   echo "Execute 'git checkout main' antes de atualizar o servidor." >&2
   exit 1
 fi
-
-for cmd in git docker curl; do
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    echo -e "${RED}${BOLD}Erro: comando obrigatório '$cmd' não encontrado.${NC}" >&2
-    exit 1
-  fi
-done
 
 if [ ! -f "$SCRIPT_DIR/docker-compose.prod.yml" ]; then
   echo -e "${RED}${BOLD}Erro: arquivo docker-compose.prod.yml não encontrado em $SCRIPT_DIR.${NC}" >&2
@@ -194,7 +194,11 @@ echo -e "${YELLOW}Últimas 50 linhas de log do container 'app':${NC}"
 docker compose -f docker-compose.prod.yml "${COMPOSE_ARGS[@]}" logs --tail=50 app || true
 echo ""
 
-MANUAL_ROLLBACK_CMD="git reset --hard ${PREV_COMMIT} && docker compose -f docker-compose.prod.yml up -d --build"
+if [ "${#COMPOSE_ARGS[@]}" -gt 0 ]; then
+  MANUAL_ROLLBACK_CMD="git reset --hard ${PREV_COMMIT} && docker compose -f docker-compose.prod.yml --env-file backend/.env up -d --build"
+else
+  MANUAL_ROLLBACK_CMD="git reset --hard ${PREV_COMMIT} && docker compose -f docker-compose.prod.yml up -d --build"
+fi
 
 run_rollback() {
   echo -e "${YELLOW}${BOLD}Executando rollback para o commit ${PREV_SHORT} (${PREV_COMMIT})...${NC}"

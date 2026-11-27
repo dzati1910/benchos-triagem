@@ -20,11 +20,18 @@ export SEED_ADMIN_PASSWORD="SmokeTest@123"
 
 BASE_URL="http://localhost:${PORT}"
 
+CLEANED_UP=0
 cleanup() {
+  if [ "$CLEANED_UP" -eq 1 ]; then
+    return 0
+  fi
+  CLEANED_UP=1
   echo "[Smoke Test] Encerrando e removendo recursos do projeto '${PROJECT_NAME}'..."
   docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" down -v --remove-orphans || true
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 print_logs_and_fail() {
   echo "[Smoke Test] Coletando logs dos containers antes de encerrar..."
